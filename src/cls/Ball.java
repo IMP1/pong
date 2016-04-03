@@ -8,7 +8,7 @@ import lib.Vector3;
 public class Ball {
 	
 	public final int radius = 16;
-	public final int speed = 48;
+	public final int speed = 96;
 	public final int spinSpeed = 32;
 	
 	public final Vector3 startPosition; 
@@ -39,25 +39,19 @@ public class Ball {
 	}
 	
 	public void updateCollisions(Vector3 dimensions, double bounciness, ArrayList<Bounce> bounces) {
-		if (position.x < -dimensions.x / 2) {
+		if (position.x - radius < -dimensions.x / 2) {
 			bounce(Vector3.i, bounciness, bounces);
 		}
-		if (position.x > dimensions.x / 2) {
+		if (position.x + radius > dimensions.x / 2) {
 			bounce(Vector3.i.negate(), bounciness, bounces);
 		}
-		if (position.y < -dimensions.y / 2) {
+		if (position.y - radius < -dimensions.y / 2) {
 			bounce(Vector3.j, bounciness, bounces);
 		}
-		if (position.y > dimensions.y / 2) {
+		if (position.y + radius > dimensions.y / 2) {
 			bounce(Vector3.j.negate(), bounciness, bounces);
 		}
-		if (position.z < -dimensions.z / 2) {
-			bounce(Vector3.k, bounciness, bounces);
-		}
-		if (position.z > dimensions.z / 2) {
-			// Don't bounce unless paddle
-//			bounce(Vector3.k.negate(), bounciness);
-		}
+		// Don't bounce on the z-axis as the players should be doing that.
 	}
 	
 	public void bounce(Vector3 normal, double bounciness, ArrayList<Bounce> bounces) {
