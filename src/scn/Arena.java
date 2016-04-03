@@ -5,6 +5,8 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 
+import jog.Graphics.HorizontalAlign;
+
 import lib.Vector3;
 
 import cls.Ball;
@@ -22,29 +24,50 @@ public class Arena extends Scene {
 	
 	private static Vector3 dimensions = new Vector3(400, 400, 300);
 	private static double depthOfField = 1.5;
-	private static double bounciness = 1;
+	private static double bounciness = 1.000001;
 	private static BallFrame ballFrame = BallFrame.DOTS;
 	
 	private ArrayList<Bounce> bounces;
 	private Ball ball;
 	private boolean hasBegun;
 	private Paddle playerPaddle;
+	private Paddle oppenentPaddle;
+	private int playerScore;
+	private int opponentScore;
 	
 	@Override
 	public void start() {
 		ball = new Ball(0, 0, 0);
 		playerPaddle = new Paddle(64, 64, (int)(dimensions.z/2));
+		oppenentPaddle = new Paddle(64, 64, (int)(-dimensions.z/2));
+		playerScore = 0;
+		opponentScore = 0;
 		hasBegun = false;
 		bounces = new ArrayList<Bounce>();
 	}
 	
 	public static double getDistanceAtDepth(double distance, double depth) {
+		double scale = scaleAtDepth(depth);
+		return distance * scale;
+	}
+	
+	public static double getWorldPosition(double distance, double depth) {
+		double scale = scaleAtDepth(depth);
+		return distance / scale;
+	}
+	
+	private static double scaleAtDepth(double depth) {
 		// (-depth / 2) <= distance <= (depth / 2)
 		double perspective = depth / (Arena.dimensions.z / 2);
 		// -1 <= perspective <= 1
 		double scale = Math.pow(depthOfField, perspective);
-		// 1 / depthOfField <= scale <= depthOfField
-		return scale * distance;
+     	// 1 / depthOfField <= scale <= depthOfField
+		return scale;
+	}
+	
+	private void reset() {
+		ball = new Ball(0, 0, 0);
+		hasBegun = false;
 	}
 	
 	private void begin() {
@@ -73,52 +96,82 @@ public class Arena extends Scene {
 		if (key == KeyEvent.VK_1) {
 			ball.spin = new Vector3(64, 64, 0).normalise();
 		}
-		
 	}
 	
 	@Override
 	public void update(double dt) {
+		updatePlayer(dt);
+		updateOpponent(dt);
 		updateBall(dt);
-		updatePaddle(dt);
 		for (Bounce b : bounces) b.update(dt);
 		for (int i = bounces.size() - 1; i >= 0; i --) {
 			if (bounces.get(i).hasFinished()) bounces.remove(i);
 		}
 	}
 	
+	private void updatePlayer(double dt) {
+		int ox = jog.Graphics.getWidth() / 2;
+		int oy = jog.Graphics.getHeight() / 2;
+		double x = jog.Input.getMouseX() - ox;
+		double y = jog.Input.getMouseY() - oy;
+		x = getWorldPosition(x, playerPaddle.depth);
+		y = getWorldPosition(y, playerPaddle.depth);
+		playerPaddle.setPosition(x, y);
+		playerPaddle.update(dt);
+	}
+
+	private void updateOpponent(double dt) {
+		double x = ball.position.x + ball.velocity.x * dt;
+		double y = ball.position.y + ball.velocity.y * dt;
+		oppenentPaddle.setPosition(x, y);
+		oppenentPaddle.update(dt);
+	}
+	
 	private void updateBall(double dt) {
 		ball.update(dt);
 		ball.updateCollisions(dimensions, bounciness, bounces);
-		if (ball.position.z >= dimensions.z / 2 + ball.radius) {
-			// TODO scoring
-			begin();
+		// Has anyone scored?
+		if (ball.position.z >= dimensions.z / 2 + ball.radius && ball.velocity.z > 0) {
+			opponentScore ++;
+			System.out.printf("%s [%d].\n", ball.position.toString(), ball.radius);
+			System.out.printf("%s [%d, %d].\n", playerPaddle.position.toString(), playerPaddle.width, playerPaddle.height);
+			reset();
 			return;
 		}
-		if (ball.position.z >= dimensions.z / 2 && !playerPaddle.justHit) {
-			int x = (int)getDistanceAtDepth(ball.position.x, ball.position.z);
-			int y = (int)getDistanceAtDepth(ball.position.y, ball.position.z);
-			if (x < playerPaddle.position.x - (playerPaddle.width / 2 + ball.radius)) return;
-			if (x > playerPaddle.position.x + (playerPaddle.width / 2 + ball.radius)) return;
-			if (y < playerPaddle.position.y - (playerPaddle.height / 2 + ball.radius)) return;
-			if (y > playerPaddle.position.y + (playerPaddle.height / 2 + ball.radius)) return;
-			Vector3 spin = playerPaddle.velocity.scale(10.0 / dimensions.x);
-			System.out.println("Hit with spin " + spin);
-			ball.velocity = Vector3.add(ball.velocity, spin);
-			ball.spin = Vector3.add(ball.spin, spin.normalise());
-			ball.bounce(Vector3.k.negate(), bounciness, null);
-			playerPaddle.justHit = true;
-		} else {
-			playerPaddle.justHit = false;
+		if (ball.position.z <= -dimensions.z / 2 - ball.radius && ball.velocity.z < 0) {
+			playerScore ++;
+			System.out.printf("%s [%d].\n", ball.position.toString(), ball.radius);
+			System.out.printf("%s [%d, %d].\n", playerPaddle.position.toString(), playerPaddle.width, playerPaddle.height);
+			reset();
+			return;
+		}
+		// Has anyone hit the ball?
+		if (ball.position.z >= dimensions.z / 2 && ball.velocity.z > 0) {
+			boolean boost = jog.Input.isMouseDown(MouseEvent.BUTTON1);
+			if (boost) bounciness *= 1.5; // TODO is this a good feature?
+			updatePaddleHit(playerPaddle);
+			if (boost) bounciness /= 1.5; // TODO well is it?
+		}
+		if (ball.position.z <= -dimensions.z / 2 && ball.velocity.z < 0) {
+			updatePaddleHit(oppenentPaddle);
 		}
 	}
 	
-	private void updatePaddle(double dt) {
-		int ox = jog.Graphics.getWidth() / 2;
-		int oy = jog.Graphics.getHeight() / 2;
-		int x = jog.Input.getMouseX() - ox;
-		int y = jog.Input.getMouseY() - oy;
-		playerPaddle.setPosition(x, y);
-		playerPaddle.update(dt);
+	private boolean updatePaddleHit(Paddle p) {
+		int x = (int)ball.position.x;
+		int y = (int)ball.position.y;
+		if (x + ball.radius < p.position.x - (p.width / 2)) return false;
+		if (x - ball.radius > p.position.x + (p.width / 2)) return false;
+		if (y + ball.radius < p.position.y - (p.height / 2)) return false;
+		if (y - ball.radius > p.position.y + (p.height / 2)) return false;
+
+		p.justHit = true;
+		Vector3 spin = p.velocity.scale(10.0 / dimensions.x);
+		System.out.println("Hit with spin " + spin);
+		ball.velocity = Vector3.add(ball.velocity, spin);
+		ball.spin = Vector3.add(ball.spin, spin.normalise());
+		ball.bounce(Vector3.k.negate(), bounciness, null);
+		return true;
 	}
 
 	@Override
@@ -134,6 +187,7 @@ public class Arena extends Scene {
 			drawBallHelper();
 			drawPaddles();
 		jog.Graphics.pop();
+		drawScore();
 	}
 	
 	private void drawArena() {
@@ -204,12 +258,24 @@ public class Arena extends Scene {
 	}
 	
 	private void drawPaddles() {
-		int depth = playerPaddle.depth;
+		drawPaddle(playerPaddle);
+		drawPaddle(oppenentPaddle);
+	}
+	
+	private void drawPaddle(Paddle p) {
+		int depth = p.depth;
 		int minX = (int)getDistanceAtDepth(-dimensions.x / 2, depth);
 		int minY = (int)getDistanceAtDepth(-dimensions.y / 2, depth);
 		int maxX = (int)getDistanceAtDepth(dimensions.x / 2, depth);
 		int maxY = (int)getDistanceAtDepth(dimensions.y / 2, depth);
-		playerPaddle.draw(new Rectangle(minX, minY, maxX, maxY));
+		p.draw(new Rectangle(minX, minY, maxX, maxY));
+	}
+	
+	private void drawScore() {
+		jog.Graphics.print("Player", 32, 32, HorizontalAlign.LEFT);
+		jog.Graphics.print("" + playerScore, 32, 64, HorizontalAlign.LEFT);
+		jog.Graphics.print("Computer", jog.Graphics.getWidth() - 32, 32, HorizontalAlign.RIGHT);
+		jog.Graphics.print("" + opponentScore, jog.Graphics.getWidth() - 32, 64, HorizontalAlign.RIGHT);
 	}
 
 }

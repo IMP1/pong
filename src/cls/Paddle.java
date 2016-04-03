@@ -38,6 +38,7 @@ public class Paddle {
 		if (hasJustHit()) {
 			fadeTimer = 0;
 			fading = true;
+			justHit = false;
 		}
 		if (fading) {
 			fadeTimer += dt;
@@ -49,7 +50,7 @@ public class Paddle {
 		}
 	}
 	
-	public void setPosition(int x, int y) {
+	public void setPosition(double x, double y) {
 		velocity = new Vector3(x - position.x, y - position.y, 0);
 		position = new Vector3(x, y, depth);
 	}
@@ -57,8 +58,8 @@ public class Paddle {
 	public void draw(Rectangle bounds) {
 		int scaledWidth = (int)Arena.getDistanceAtDepth(width, depth);
 		int scaledHeight = (int)Arena.getDistanceAtDepth(height, depth);
-		int x = (int)position.x - scaledWidth / 2;
-		int y = (int)position.y - scaledHeight / 2;
+		int x = (int)Arena.getDistanceAtDepth(position.x, depth) - scaledWidth / 2;
+		int y = (int)Arena.getDistanceAtDepth(position.y, depth) - scaledHeight / 2;
 		
 		x = (int)Math.max(bounds.x, x);
 		y = (int)Math.max(bounds.y, y);
