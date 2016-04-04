@@ -7,6 +7,8 @@ import lib.Vector3;
 
 public class Paddle {
 
+	private static final double EPSILON = 0.0001;
+	
 	private static final double FADE_DURATION = 0.4;
 	
 	public final int width;
@@ -51,7 +53,12 @@ public class Paddle {
 	}
 	
 	public void setPosition(double x, double y) {
-		velocity = new Vector3(x - position.x, y - position.y, 0);
+		if (x == position.x && y == position.y) {
+			velocity = velocity.scale(0.9);
+			if (velocity.magnitudeSquared() < EPSILON * EPSILON) velocity = Vector3.ZERO;
+		} else {
+			velocity = new Vector3(x - position.x, y - position.y, 0);
+		}
 		position = new Vector3(x, y, depth);
 	}
 	
